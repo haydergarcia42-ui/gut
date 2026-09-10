@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin - H.g Music</title>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<style>
+*{box-sizing:border-box;font-family:Arial,sans-serif}
+body{background:#0d0d0d;color:#fff;margin:0;padding:20px;display:flex;justify-content:center}
+.wrap{max-width:480px;width:100%}
+h1{font-size:22px;margin-bottom:20px;color:#9db6ff}
+h2{font-size:16px;margin:0 0 14px;color:#9db6ff}
+.card{background:#181818;border-radius:14px;padding:20px;margin-bottom:20px}
+input,textarea{width:100%;padding:12px;border-radius:8px;border:none;margin-bottom:12px;font-size:15px;box-sizing:border-box;font-family:inherit}
+textarea{resize:vertical;min-height:70px}
+button{width:100%;padding:13px;border:none;border-radius:10px;background:#3b6dff;color:#fff;font-weight:700;font-size:15px;cursor:pointer}
+button:disabled{opacity:.5}
+.resultado{margin-top:14px;padding:12px;background:#1a1a1a;border-radius:8px;word-break:break-all;font-size:14px;color:#7bffb0;display:none}
+#loginBox{display:flex}
+#panelBox{display:none}
+.fila{display:flex;gap:10px}
+.fila input{flex:1}
+small{color:#8a94b8;display:block;margin-top:-8px;margin-bottom:12px;font-size:12px}
+label{display:flex;align-items:center;gap:8px;color:#c9d0ec;font-size:14px;margin-bottom:14px}
+label input[type="checkbox"]{width:auto;margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>H.g Music - Panel Admin</h1>
+
+<div class="card" id="loginBox">
+  <input type="password" id="passAdmin" placeholder="Contraseña de administrador">
+  <button onclick="entrarAdmin()">Entrar</button>
+</div>
+
+<div id="panelBox">
+  <div class="card">
+    <h2>Activar Premium</h2>
+    <input type="text" id="idUsuario" placeholder="ID del usuario (UID)">
+    <div class="fila">
+      <input type="number" id="diasCodigo" placeholder="Días" min="0" value="0">
+      <input type="number" id="minutosCodigo" placeholder="Minutos (para pruebas)" min="0" value="0">
+    </div>
+    <small>Deja "Minutos" en 0 para uso normal. Usalo solo para probar vencimientos rapido (ej: 2 minutos).</small>
+    <button onclick="activarPremiumPorId()">Activar Premium</button>
+    <div class="resultado" id="resultadoCodigo"></div>
+  </div>
+
+  <div class="card">
+    <h2>Publicar actualización de la app</h2>
+    <input type="text" id="nuevaVersion" placeholder="Número de versión (ej: 1.5)">
+    <textarea id="mensajeActualizacion" placeholder="Mensaje para el usuario (ej: Hay una nueva actualización disponible con mejoras)"></textarea>
+    <input type="text" id="linkActualizacion" placeholder="Link de descarga del nuevo APK">
+    <small>Al publicar, todos los usuarios con una versión menor a esta veran el aviso obligatorio de actualizar la próxima vez que abran la app con internet.</small>
+    <button onclick="publicarActualizacion()">Publicar actualización</button>
+    <div class="resultado" id="resultadoActualizacion"></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCK4ZBqRDJ7siu77hzOkNgzmejE58INzq8",
+  authDomain: "hg-music-50f99.firebaseapp.com",
+  projectId: "hg-music-50f99",
+  storageBucket: "hg-music-50f99.firebasestorage.app",
+  messagingSenderId: "937630591131",
+  appId: "1:937630591131:web:01f7f02418aec6a8507e3e"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const CLAVE_ADMIN = "hayder0216";
+
+function entrarAdmin(){
+  const val = document.getElementById("passAdmin").value;
+  if(val === CLAVE_ADMIN){
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("panelBox").style.display = "block";
+  } else {
+    alert("Contraseña incorrecta.");
+  }
+}
+
+async function activarPremiumPorId(){
+  const uid = document.getElementById("idUsuario").value.trim();
+  const dias = Number(document.getElementById("diasCodigo").value) || 0;
+  const minutos = Number(document.getElementById("minutosCodigo").value) || 0;
+  if(!uid){ alert("Escribe el ID del usuario."); return; }
+  if(dias <= 0 && minutos <= 0){ alert("Escribe días o minutos válidos."); return; }
+  const totalMs = (dias * 24 * 60 * 60 * 1000) + (minutos * 60 * 1000);
+  const expiraEn = Date.now() + totalMs;
+  try{
+    await db.collection("usuarios").doc(uid).set({
+      premium: true,
+      premiumExpira: expiraEn
+    }, { merge: true });
+    const box = document.getElementById("resultadoCodigo");
+    box.style.display = "block";
+    box.textContent = "Premium activado para " + uid + " por " + dias + " dias y " + minutos + " minutos.";
+    document.getElementById("idUsuario").value = "";
+    document.getElementById("diasCodigo").value = "0";
+    document.getElementById("minutosCodigo").value = "0";
+  }catch(e){
+    alert("Error al activar: " + e);
+  }
+}
+
+async function publicarActualizacion(){
+  const version = document.getElementById("nuevaVersion").value.trim();
+  const mensaje = document.getElementById("mensajeActualizacion").value.trim();
+  const link = document.getElementById("linkActualizacion").value.trim();
+  if(!version){ alert("Escribe el numero de version (ej: 1.5)."); return; }
+  if(!mensaje){ alert("Escribe un mensaje para el usuario."); return; }
+  if(!link){ alert("Escribe el link de descarga del nuevo APK."); return; }
+  try{
+    await db.collection("configuracion").doc("app").set({
+      versionActual: version,
+      mensajeActualizacion: mensaje,
+      linkActualizacion: link,
+      publicadoEn: Date.now()
+    }, { merge: true });
+    const box = document.getElementById("resultadoActualizacion");
+    box.style.display = "block";
+    box.textContent = "Actualizacion version " + version + " publicada. Los usuarios veran el aviso al abrir la app.";
+  }catch(e){
+    alert("Error al publicar: " + e);
+  }
+}
+</script>
+</body>
+</html>
